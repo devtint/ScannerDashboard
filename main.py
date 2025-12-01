@@ -306,6 +306,92 @@ async def get_scan_details(
     })
 
 
+@app.delete("/api/scans/{scan_id}")
+async def delete_scan(
+    scan_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete a scan record"""
+    query = select(ScanRecord).where(ScanRecord.id == scan_id)
+    result = await db.execute(query)
+    record = result.scalar_one_or_none()
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    
+    # Store info for audit before deletion
+    target_url = record.target_url
+    scanner_name = record.scanner_name
+    
+    # Delete record (cascade will handle related records)
+    await db.delete(record)
+    
+    # Log audit
+    audit = AuditLog(
+        action="scan_deleted",
+        target_url=target_url,
+        scanner_name=scanner_name,
+        details={"scan_id": scan_id}
+    )
+    db.add(audit)
+    await db.commit()
+    
+    return JSONResponse(content={
+        "status": "success",
+        "message": f"Scan {scan_id} deleted successfully"
+    })
+
+
+@app.post("/api/scans/{scan_id}/rescan")
+async def rescan(
+    scan_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
+    """Re-run the exact same scan with the same configuration"""
+    query = select(ScanRecord).where(ScanRecord.id == scan_id)
+    result = await db.execute(query)
+    record = result.scalar_one_or_none()
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    
+    # Extract original scan configuration
+    url = record.target_url
+    scanner_name = record.scanner_name
+    
+    # Create new scan ID
+    new_scan_id = datetime.utcnow().isoformat()
+    
+    # Run scan in background
+    background_tasks.add_task(
+        execute_scans,
+        scan_id=new_scan_id,
+        url=url,
+        scanner_names=[scanner_name],
+        db=db
+    )
+    
+    # Log audit
+    audit = AuditLog(
+        action="scan_rerun",
+        target_url=url,
+        scanner_name=scanner_name,
+        details={"original_scan_id": scan_id, "new_scan_id": new_scan_id}
+    )
+    db.add(audit)
+    await db.commit()
+    
+    return JSONResponse(content={
+        "status": "started",
+        "message": f"Re-scanning {url} with {scanner_name}",
+        "original_scan_id": scan_id,
+        "new_scan_id": new_scan_id,
+        "url": url,
+        "scanner": scanner_name
+    })
+
+
 @app.get("/api/statistics")
 async def get_statistics(db: AsyncSession = Depends(get_db)):
     """Get platform statistics"""

@@ -295,6 +295,71 @@ function securityScanner() {
         },
 
         /**
+         * Delete a scan record
+         * @param {number} scanId - ID of the scan to delete
+         */
+        async deleteScan(scanId) {
+            if (!confirm('Are you sure you want to delete this scan?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/scans/${scanId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to delete scan');
+                }
+                
+                // Close modal if open
+                if (this.showModal && this.selectedScan?.id === scanId) {
+                    this.closeModal();
+                }
+                
+                // Reload scans
+                await this.loadRecentScans();
+                await this.loadStatistics();
+                
+                this.showNotification('Scan deleted successfully', 'success');
+            } catch (error) {
+                console.error('Failed to delete scan:', error);
+                alert('Failed to delete scan');
+            }
+        },
+
+        /**
+         * Re-run the exact same scan
+         * @param {number} scanId - ID of the scan to re-run
+         */
+        async rescan(scanId) {
+            try {
+                const response = await fetch(`/api/scans/${scanId}/rescan`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to start rescan');
+                }
+                
+                const data = await response.json();
+                
+                // Update UI to show scanning state
+                this.scanning = true;
+                this.scanProgress = { completed: 0, total: 1 };
+                this.scanMessages = [`Re-scanning ${data.url} with ${data.scanner}...`];
+                
+                // Close modal
+                this.closeModal();
+                
+                this.showNotification('Rescan started successfully', 'success');
+            } catch (error) {
+                console.error('Failed to start rescan:', error);
+                alert('Failed to start rescan');
+            }
+        },
+
+        /**
          * Close modal
          */
         closeModal() {
