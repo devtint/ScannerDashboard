@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Comprehensive security scanning platform with real-time monitoring">
+    <title>Security Scanner Platform</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/static/images/logo.svg">
+    
+    <!-- CDN Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-gray-50">
+    <div x-data="securityScanner()" x-init="init()" class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">🛡️ Security Scanner Platform</h1>
+                        <p class="text-sm text-gray-500">Comprehensive security analysis for your web applications</p>
+                    </div>
+                    <div class="flex gap-4 text-sm">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-blue-600" x-text="stats.total_scans"></div>
+                            <div class="text-gray-500">Total Scans</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-green-600" x-text="stats.scans_today"></div>
+                            <div class="text-gray-500">Today</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-purple-600" x-text="stats.average_security_score"></div>
+                            <div class="text-gray-500">Avg Score</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+            
+            <!-- Scan Form -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h2 class="text-xl font-semibold mb-4">Start New Scan</h2>
+                <form @submit.prevent="startScan()" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Target URL</label>
+                        <input 
+                            type="url" 
+                            x-model="scanUrl" 
+                            placeholder="https://example.com"
+                            required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Scanners</label>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <template x-for="scanner in availableScanners" :key="scanner.id">
+                                <label class="flex items-center space-x-2 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        :value="scanner.id"
+                                        x-model="selectedScanners"
+                                        class="rounded text-blue-600 focus:ring-blue-500"
+                                    >
+                                    <span class="text-sm" x-text="scanner.name"></span>
+                                </label>
+                            </template>
+                        </div>
+                        <button 
+                            type="button" 
+                            @click="selectAllScanners()"
+                            class="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                        >
+                            Select All
+                        </button>
+                    </div>
+                    
+                    <button 
+                        type="submit"
+                        :disabled="scanning"
+                        class="w-full bg-blue-600 text-white py-3 px-6 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium transition"
+                        x-text="scanning ? 'Scanning...' : 'Start Scan'"
+                    ></button>
+                </form>
+                
+                <!-- Progress -->
+                <div x-show="scanning" x-cloak class="mt-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium">Scan Progress</span>
+                        <span class="text-sm text-gray-500" x-text="`${scanProgress.completed} / ${scanProgress.total}`"></span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                            class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            :style="`width: ${(scanProgress.completed / scanProgress.total) * 100}%`"
+                        ></div>
+                    </div>
+                    <div class="mt-2 space-y-1">
+                        <template x-for="msg in scanMessages" :key="msg">
+                            <div class="text-xs text-gray-600" x-text="msg"></div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Scans -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">Recent Scans</h2>
+                    <button 
+                        @click="loadRecentScans()"
+                        class="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                        🔄 Refresh
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <template x-for="scan in recentScans" :key="scan.id">
+                        <div 
+                            class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
+                            @click="viewScanDetails(scan.id)"
+                        >
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="flex-1">
+                                    <h3 class="font-medium text-gray-900" x-text="scan.target_url"></h3>
+                                    <p class="text-sm text-gray-500">
+                                        <span x-text="scan.scanner_name.replace('_', ' ')"></span> • 
+                                        <span x-text="formatDate(scan.scan_date)"></span> • 
+                                        <span x-text="scan.duration.toFixed(2) + 's'"></span>
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <div 
+                                        class="text-2xl font-bold"
+                                        :class="getScoreColor(scan.security_score)"
+                                        x-text="scan.security_score"
+                                    ></div>
+                                    <div class="text-xs text-gray-500">Score</div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex gap-4 text-sm">
+                                <span class="severity-critical">Critical: <span x-text="scan.summary.critical"></span></span>
+                                <span class="severity-high">High: <span x-text="scan.summary.high"></span></span>
+                                <span class="severity-medium">Medium: <span x-text="scan.summary.medium"></span></span>
+                                <span class="severity-low">Low: <span x-text="scan.summary.low"></span></span>
+                                <span class="severity-info">Info: <span x-text="scan.summary.info"></span></span>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <div x-show="recentScans.length === 0" x-cloak class="text-center text-gray-500 py-8">
+                        No scans yet. Start your first scan above!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scan Details Modal -->
+            <div 
+                x-show="showModal" 
+                x-cloak
+                class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                @click.self="showModal = false"
+            >
+                <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h2 class="text-2xl font-bold" x-text="selectedScan?.target_url"></h2>
+                            <p class="text-sm text-gray-500">
+                                <span x-text="selectedScan?.scanner_name.replace('_', ' ')"></span> • 
+                                <span x-text="formatDate(selectedScan?.scan_date)"></span>
+                            </p>
+                        </div>
+                        <button 
+                            @click="showModal = false"
+                            class="text-gray-500 hover:text-gray-700 text-2xl"
+                        >&times;</button>
+                    </div>
+                    
+                    <!-- Summary -->
+                    <div class="grid grid-cols-5 gap-4 mb-6">
+                        <div class="text-center p-3 bg-red-50 rounded">
+                            <div class="text-2xl font-bold text-red-600" x-text="selectedScan?.summary.critical"></div>
+                            <div class="text-xs text-gray-600">Critical</div>
+                        </div>
+                        <div class="text-center p-3 bg-orange-50 rounded">
+                            <div class="text-2xl font-bold text-orange-600" x-text="selectedScan?.summary.high"></div>
+                            <div class="text-xs text-gray-600">High</div>
+                        </div>
+                        <div class="text-center p-3 bg-yellow-50 rounded">
+                            <div class="text-2xl font-bold text-yellow-600" x-text="selectedScan?.summary.medium"></div>
+                            <div class="text-xs text-gray-600">Medium</div>
+                        </div>
+                        <div class="text-center p-3 bg-blue-50 rounded">
+                            <div class="text-2xl font-bold text-blue-600" x-text="selectedScan?.summary.low"></div>
+                            <div class="text-xs text-gray-600">Low</div>
+                        </div>
+                        <div class="text-center p-3 bg-green-50 rounded">
+                            <div class="text-2xl font-bold text-green-600" x-text="selectedScan?.summary.info"></div>
+                            <div class="text-xs text-gray-600">Info</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Results -->
+                    <div class="space-y-3">
+                        <template x-for="result in selectedScan?.results" :key="result.check_name">
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="font-medium" x-text="result.check_name"></h3>
+                                    <span 
+                                        class="text-sm font-medium px-2 py-1 rounded"
+                                        :class="`severity-${result.severity}`"
+                                        x-text="result.severity.toUpperCase()"
+                                    ></span>
+                                </div>
+                                <p class="text-sm text-gray-700 mb-2" x-text="result.message"></p>
+                                <div x-show="result.details" class="text-xs text-gray-500 mb-2" x-text="result.details"></div>
+                                <div x-show="result.recommendation" class="text-xs bg-blue-50 p-2 rounded">
+                                    <strong>Recommendation:</strong> <span x-text="result.recommendation"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Custom JavaScript -->
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/scanner.js"></script>
+</body>
+</html>

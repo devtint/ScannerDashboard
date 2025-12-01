@@ -1,0 +1,23 @@
+<!-- SVG Logo for Security Scanner Platform -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Shield shape -->
+  <path d="M100 20 L160 40 L160 100 Q160 140 100 180 Q40 140 40 100 L40 40 Z" 
+        fill="#2563eb" stroke="#1e40af" stroke-width="3"/>
+  
+  <!-- Inner shield accent -->
+  <path d="M100 35 L145 50 L145 100 Q145 130 100 160 Q55 130 55 100 L55 50 Z" 
+        fill="#3b82f6" opacity="0.8"/>
+  
+  <!-- Check mark -->
+  <polyline points="75,95 90,110 125,75" 
+            fill="none" stroke="white" stroke-width="8" 
+            stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Scanner lines effect -->
+  <g opacity="0.3">
+    <line x1="60" y1="70" x2="140" y2="70" stroke="white" stroke-width="2"/>
+    <line x1="60" y1="85" x2="140" y2="85" stroke="white" stroke-width="2"/>
+    <line x1="60" y1="115" x2="140" y2="115" stroke="white" stroke-width="2"/>
+    <line x1="60" y1="130" x2="140" y2="130" stroke="white" stroke-width="2"/>
+  </g>
+</svg>
